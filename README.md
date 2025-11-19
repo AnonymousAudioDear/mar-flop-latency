@@ -1,15 +1,12 @@
 # MAR FLOPS and Latency Calculation
 
-### Installation
-
-Download the code:
+### Download the code:
+Click `Download Repository` on the top right.
 ```
-git clone 
 cd mar
 ```
 
-A suitable [conda](https://conda.io/) environment named `mar` can be created and activated with:
-
+### Installation
 ```
 conda env create -f environment.yaml
 conda activate mar
