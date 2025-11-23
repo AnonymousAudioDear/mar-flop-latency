@@ -26,7 +26,7 @@ class Args:
     cfg_schedule = "linear"
     temperature = 1.0
     model = "mar_large"
-    repetitions = 1
+    repetitions = 10
     warmup = 20
     num_sampling_steps = '100'
     num_iter = 64
@@ -91,7 +91,7 @@ starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_t
 
 # 1. Class embedding
 timings_class = np.zeros(args.repetitions)
-print("Measuring Class Embedding latency...")
+
 with torch.no_grad():
     for rep in range(args.repetitions):
         starter.record()
@@ -102,7 +102,7 @@ with torch.no_grad():
         timings_class[rep] = starter.elapsed_time(ender)
 
 # 2. Measure Transformer and DiffLoss in the actual loop
-print("Measuring Transformer and DiffLoss latency in real loop...")
+print("Measuring Transformer Encoder and MLP diffusion sampler latency in loop...")
 timings_transformer = []
 timings_diff = []
 token_counts = []
@@ -129,7 +129,7 @@ with torch.no_grad():
         else:
             tokens_cfg, class_cfg, mask_cfg = tokens, class_embedding, mask
 
-        # Measure Transformer (encoder + decoder)
+        # Measure Transformer
         timings_trans_iter = np.zeros(args.repetitions)
         for rep in range(args.repetitions):
             starter.record()
@@ -139,7 +139,7 @@ with torch.no_grad():
             ender.record()
             torch.cuda.synchronize()
             timings_trans_iter[rep] = starter.elapsed_time(ender)
-        timings_transformer.append(timings_trans_iter)
+        timings_transformer.append(np.mean(timings_trans_iter))
 
         # Get z for DiffLoss measurement
         with ctx:
@@ -150,7 +150,7 @@ with torch.no_grad():
         mask_ratio = np.cos(math.pi / 2 * (step + 1) / args.num_iter)
         mask_len = torch.Tensor([np.floor(model.seq_len * mask_ratio)]).cuda()
         mask_len = torch.maximum(torch.Tensor([1]).cuda(),
-                                torch.minimum(torch.sum(mask, dim=1, keepdims=True) - 1, mask_len))
+                                torch.minimum(torch.sum(mask, dim=-1, keepdims=True) - 1, mask_len))
 
         mask_next = mask_by_order(mask_len[0], orders, bsz, model.seq_len)
 
